@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "es2021",
+    "lib": ["es2021", "dom"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "module": "ES2022" /* Specify what module code is generated. */,
+    "moduleResolution": "node",
+    "types": [],
+    "resolveJsonModule": true /* Enable importing .json files */,
+    "isolatedModules": true /* Ensure that each file can be safely transpiled without relying on other imports. */,
+    "strict": true /* Enable all strict type-checking options. */,
+    "skipLibCheck": true /* Skip type checking all .d.ts files. */
+  },
+  "references": [{ "path": "../tsconfig.json" }]
+}
