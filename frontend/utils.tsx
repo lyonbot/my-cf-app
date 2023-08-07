@@ -29,7 +29,7 @@ export function modelX(el: HTMLInputElement, x: () => Signal<any>) {
   onCleanup(() => el.removeEventListener("change", onChange));
 }
 
-export function FormField(props: { label: string, children: any }) {
+export function FormField(props: { label: any, children: any }) {
   return <div class="field">
     <label class="label">{props.label}</label>
     <div class="control">{props.children}</div>

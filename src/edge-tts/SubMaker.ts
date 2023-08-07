@@ -15,10 +15,10 @@ export class SubMaker {
   generate_subs() {
     if (this.subs.length !== this.offset.length) return ''
 
-    let data = "WEBVTT\r\n\r\n";
+    let data = "";
     for (let i = 0; i < this.subs.length; i++) {
       let sub = unescape(this.subs[i]);
-      data += formatter(this.offset[i][0], this.offset[i][1] + this.overlapping, sub);
+      data += (i + 1) + "\r\n" + formatter(this.offset[i][0], this.offset[i][1] + this.overlapping, sub);
     }
     return data;
   }
@@ -32,15 +32,20 @@ function formatter(start: number, end: number, text: string) {
   return `${format_time(start)} --> ${format_time(end)}\r\n${text}\r\n\r\n`;
 }
 
+/**
+ * 
+ * @param time 
+ * @returns eg: `00:00:10,009`
+ */
 function format_time(time: number) {
   let hours = Math.floor(time / (60 * 60 * 10 ** 7));
   let minutes = Math.floor((time % (60 * 60 * 10 ** 7)) / (60 * 10 ** 7));
   let seconds = Math.floor((time % (60 * 10 ** 7)) / 10 ** 7);
-  let milliseconds = time % 10 ** 7;
+  let milliseconds = Math.floor(time % 10 ** 7 / 10000);
   return (
     `${hours.toString().padStart(2, "0")}:` +
     `${minutes.toString().padStart(2, "0")}:` +
-    `${seconds.toString().padStart(2, "0")}.` +
-    `${milliseconds.toString().padStart(7, "0")}`
+    `${seconds.toString().padStart(2, "0")},` +
+    `${milliseconds.toString().padStart(3, "0")}`
   );
 }
