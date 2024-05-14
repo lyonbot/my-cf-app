@@ -15,6 +15,8 @@ export function TTSPage() {
   const [loading, setLoading] = createSignal(false)
 
   const [audioUrl, setAudioUrl] = createSignal('')
+  const [srt1Url, setSrt1Url] = createSignal('')
+  const [srt2Url, setSrt2Url] = createSignal('')
   const [voice, setVoice] = createSignal('zh-CN-YunxiaNeural')
   const [voices] = createResource<VoiceInfo[]>(() => fetchJson('/tts/listVoices'))
 
@@ -41,6 +43,11 @@ export function TTSPage() {
       setAudioUrl(URL.createObjectURL(blob))
       setResp(resp)
 
+      let srt1 = new File([resp.sentenceSubtitle], 'srt1.srt', { type: 'text/plain' })
+      setSrt1Url(URL.createObjectURL(srt1))
+
+      let srt2 = new File([resp.sentenceSubtitle], 'srt2.srt', { type: 'text/plain' })
+      setSrt1Url(URL.createObjectURL(srt2))
     } catch (error) {
       console.log("error", error)
       alert(String(error))
@@ -87,10 +94,12 @@ export function TTSPage() {
       <Show when={resp()}>
 
         <FormField label="字幕1">
+          <a class="button" download={"audio-" + text().slice(0, 10) + ".srt"} href={srt1Url()}>下载srt字幕</a>
           <textarea class="textarea" readOnly>{resp()!.sentenceSubtitle}</textarea>
         </FormField>
 
         <FormField label="字幕2">
+          <a class="button" download={"audio-" + text().slice(0, 10) + "-words.srt"} href={srt2Url()}>下载srt字幕</a>
           <textarea class="textarea" readOnly>{resp()!.wordSubtitle}</textarea>
         </FormField>
 

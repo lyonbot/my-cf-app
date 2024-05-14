@@ -1,4 +1,6 @@
+import { Hono } from 'hono';
 import { EdgeTTS } from "./edge-tts"
+import { parseMedia } from './media-parser';
 import { homepageHTML } from "./static";
 
 /**
@@ -25,57 +27,68 @@ export interface Env {
 	// MY_SERVICE: Fetcher;
 }
 
-export default {
-	fetch: async function (
-		request: Request,
-		env: Env,
-		ctx: ExecutionContext
-	): Promise<Response> {
-		const reqOrigin = request.headers.get('origin') || '*'
-		const corsHeaders = {
-			"Access-Control-Allow-Origin": reqOrigin,
-			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-			"Access-Control-Allow-Headers": "Content-Type",
-			"Access-Control-Max-Age": "86400",
-			"Vary": "Origin"
-		}
+const app = new Hono()
 
-		const method = request.method
-		const { pathname, searchParams: query } = new URL(request.url)
-		if (method === 'OPTIONS') return new Response('OK', { headers: corsHeaders })
+app.use(async (c, next) => {
+	const reqOrigin = c.req.header('origin') || '*'
+	c.header("Access-Control-Allow-Origin", reqOrigin)
+	c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+	c.header("Access-Control-Allow-Headers", "Content-Type")
+	c.header("Access-Control-Max-Age", "86400")
+	c.header("Vary", "Origin")
 
-		// ------------------------------------
+	if (c.req.method === 'OPTIONS') {
+		return c.body('OK')
+	}
+	return next()
+})
 
-		if (method === 'GET' && pathname === '/') {
-			return new Response(homepageHTML, { headers: { ...corsHeaders, 'content-type': 'text/html' } })
-		}
+app.get('/', (c) => c.html(homepageHTML))
+app.get('/tts', async (c) => {
+	const tts = new EdgeTTS();
 
-		if (method === 'GET' && pathname === '/tts/listVoices') {
-			const ans = await EdgeTTS.listVoices()
-			const blob = new Blob([JSON.stringify(ans)], { type: 'application/json' })
-			return new Response(blob, { headers: corsHeaders })
-		}
+	const format = c.req.query('format') as 'audio' | 'full' || 'audio'
+	if (c.req.query('voice')) tts.setVoice(c.req.query('voice')!);
 
-		if (method === 'GET' && pathname === '/tts') {
-			const tts = new EdgeTTS();
+	const result = await tts.synthesize(String(c.req.query('text') ||
+		"春节过后，北京、上海、深圳、南京、武汉等多地都传出房地产市场回暖的消息，楼市似乎在一夜间就由冷转热。市场的急剧变化，让很多从业者都有些措手不及。北京一位房产经纪人对中新经纬说：“回暖速度太快，我们也觉得有些突然。”"
+	));
 
-			const format = query.get('format') as 'audio' | 'full' || 'audio'
-			if (query.has('voice')) tts.setVoice(query.get('voice')!);
+	const blob = new Blob([...result.chunks], { type: 'audio/mpeg' })
+	if (format === 'audio') return c.body(blob.stream())
 
-			const result = await tts.synthesize(String(query.get('text') ||
-				"春节过后，北京、上海、深圳、南京、武汉等多地都传出房地产市场回暖的消息，楼市似乎在一夜间就由冷转热。市场的急剧变化，让很多从业者都有些措手不及。北京一位房产经纪人对中新经纬说：“回暖速度太快，我们也觉得有些突然。”"
-			));
+	return c.json({
+		audio: btoa(Array.from(new Uint8Array(await blob.arrayBuffer()), x => String.fromCharCode(x)).join('')),
+		wordSubtitle: result.wordSubtitle.generate_subs(),
+		sentenceSubtitle: result.sentenceSubtitle.generate_subs(),
+	})
+})
+app.get('/tts/listVoices', async (c) => {
+	const ans = await EdgeTTS.listVoices()
+	return c.json(ans)
+})
 
-			const blob = new Blob([...result.chunks], { type: 'audio/mpeg' })
-			if (format === 'audio') return new Response(blob, { headers: corsHeaders })
+app.get('/media/*', async (c) => {
+	const url = c.req.query('url') || c.req.path.slice(7)
+	const parsed = await parseMedia(url)
 
-			return new Response(JSON.stringify({
-				audio: btoa(Array.from(new Uint8Array(await blob.arrayBuffer()), x => String.fromCharCode(x)).join('')),
-				wordSubtitle: result.wordSubtitle.generate_subs(),
-				sentenceSubtitle: result.sentenceSubtitle.generate_subs(),
-			}), { headers: corsHeaders })
-		}
+	return c.json({ result: parsed })
+})
+app.get('/pro/*', async (c) => {
+	const url = new URL(c.req.path.slice(5))
+	url.search = new URLSearchParams(c.req.query()).toString()
 
-		return new Response(null, { status: 404 })
-	},
-};
+	const headers = {
+		...c.req.header(),
+		host: url.hostname,
+	} as Record<string, string>
+	if (headers.referer?.includes('/pro/')) headers.referer = headers.referer.slice(headers.referer.indexOf('/pro/') + 5)
+
+	const resp = await fetch(url, { headers })
+
+	c.status(resp.status as any)
+	resp.headers.forEach((v, k) => c.header(k, v))
+	return c.body(await resp.arrayBuffer())
+})
+
+export default app;
