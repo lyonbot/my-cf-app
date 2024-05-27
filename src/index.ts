@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { EdgeTTS } from "./edge-tts"
 import { parseMedia } from './media-parser';
 import { homepageHTML } from "./static";
+import { searchUnsplash } from './unsplash';
 
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
@@ -89,6 +90,24 @@ app.get('/pro/*', async (c) => {
 	c.status(resp.status as any)
 	resp.headers.forEach((v, k) => c.header(k, v))
 	return c.body(await resp.arrayBuffer())
+})
+
+app.get('/unsplash', async (c) => {
+	const query = c.req.query('query')
+	const page = (+c.req.query('page')!) || 1
+	const size = (+c.req.query('size')!) || 20
+	const randomPick = +c.req.query('pick')!
+
+	if (!query) return c.json({ error: 'query is required' }, 400)
+	if (page < 1 || !Number.isInteger(page)) return c.json({ error: 'page must be a positive integer' }, 400)
+	if (size < 1 || !Number.isInteger(size)) return c.json({ error: 'size must be a positive integer' }, 400)
+
+	const result = await searchUnsplash(query, { page, size })
+	if (!randomPick) return c.json(result)
+
+	// random pick image
+	const randomIndex = randomPick % result.results.length
+	return c.redirect(result.results[randomIndex].urls.regular)
 })
 
 export default app;

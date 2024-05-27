@@ -2,11 +2,13 @@ import { createEffect, createMemo, createSignal, lazy, Suspense } from "solid-js
 import { Dynamic, render } from "solid-js/web";
 import { TTSPage } from "./tts";
 import { DownloaderPage } from "./downloader";
+import { OtherAPIPage } from "./other-api";
 import './index.css';
 
 const pageApps = {
   TTS: TTSPage,
-  Downloader: DownloaderPage
+  Downloader: DownloaderPage,
+  OtherAPI: OtherAPIPage,
 }
 const pageKeys = Object.keys(pageApps) as (keyof typeof pageApps)[]
 
