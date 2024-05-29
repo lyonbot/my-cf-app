@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { EdgeTTS } from "./edge-tts"
 import { parseMedia } from './media-parser';
+import { searchShutterStockVideo } from './shutter-stock';
 import { homepageHTML } from "./static";
 import { searchUnsplash } from './unsplash';
 
@@ -108,6 +109,33 @@ app.get('/unsplash', async (c) => {
 	// random pick image
 	const randomIndex = randomPick % result.results.length
 	return c.redirect(result.results[randomIndex].urls.regular)
+})
+
+app.get('/shutter-stock-video', async (c) => {
+	const query = c.req.query('query')
+	const page = (+c.req.query('page')!) || 1
+	const randomPick = +c.req.query('pick')!
+
+	if (!query) return c.json({ error: 'query is required' }, 400)
+	if (page < 1 || !Number.isInteger(page)) return c.json({ error: 'page must be a positive integer' }, 400)
+
+	const result = await searchShutterStockVideo(query, { page })
+	if (!randomPick) return c.json(result)
+
+	// random pick image
+	const videos = result.videos
+	const randomIndex = randomPick % videos.length
+	const videoURL = videos[randomIndex].video_files[0].link
+
+	const videoRes = await fetch(videoURL)
+	const videoBuffer = await videoRes.arrayBuffer()
+	
+	// for (const k of ['Content-Type', 'Content-Length', 'content-encoding']) {
+	// 	if (videoRes.headers.get(k)) c.header(k, videoRes.headers.get(k)!)
+	// }
+	c.header('content-type', 'video/mp4')
+	c.header('cache-control', videoRes.status === 200 ? 'public, max-age=31536000' : 'no-cache')
+  return c.body(videoBuffer)
 })
 
 export default app;
