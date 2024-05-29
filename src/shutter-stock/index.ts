@@ -2,10 +2,14 @@ const key = 'gctKuNNKkPvvf9FegwLANT4iSYYv27rWuzPzTkkKOaN8xYsvmhPMcZJh'
 
 export async function searchShutterStockVideo(keyword: string, opts?: {
   page?: number
+  orientation?: 'landscape' | 'portrait' | 'square'
 }) {
   let url = new URL(`https://api.pexels.com/videos/search`)
   url.searchParams.set('query', keyword)
+  url.searchParams.set('per_page', '20')
+
   if (+opts?.page! > 1) url.searchParams.set('page', String(opts?.page))
+  url.searchParams.set('orientation', opts?.orientation || 'landscape')
 
   let answer: ShutterStockVideoResult = await fetch(url, {
     headers: {

@@ -13,6 +13,7 @@ export function OtherAPIPage() {
     <ul>
       <li>query</li>
       <li>page ?= 1</li>
+      <li>orientation ?= 'landscape' | 'portrait' | 'square'</li>
       <li>pick ?= 0 -- redirect to a random image</li>
     </ul>
   </div>

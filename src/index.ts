@@ -113,13 +113,14 @@ app.get('/unsplash', async (c) => {
 
 app.get('/shutter-stock-video', async (c) => {
 	const query = c.req.query('query')
+	const orientation = c.req.query('orientation') as 'landscape' | 'portrait' | 'square'
 	const page = (+c.req.query('page')!) || 1
 	const randomPick = +c.req.query('pick')!
 
 	if (!query) return c.json({ error: 'query is required' }, 400)
 	if (page < 1 || !Number.isInteger(page)) return c.json({ error: 'page must be a positive integer' }, 400)
 
-	const result = await searchShutterStockVideo(query, { page })
+	const result = await searchShutterStockVideo(query, { page, orientation })
 	if (!randomPick) return c.json(result)
 
 	// random pick image
