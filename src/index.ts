@@ -108,7 +108,13 @@ app.get('/unsplash', async (c) => {
 
 	// random pick image
 	const randomIndex = randomPick % result.results.length
-	return c.redirect(result.results[randomIndex].urls.regular)
+	const imageUrl = result.results[randomIndex].urls.regular;
+
+	const imageRes = await fetch(imageUrl)
+	const imageBuffer = await imageRes.arrayBuffer()
+	c.header('content-type', imageRes.headers.get('content-type') || 'image/jpg')
+	c.header('cache-control', imageRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
+  return c.body(imageBuffer)
 })
 
 app.get('/shutter-stock-video', async (c) => {
@@ -135,7 +141,7 @@ app.get('/shutter-stock-video', async (c) => {
 	// 	if (videoRes.headers.get(k)) c.header(k, videoRes.headers.get(k)!)
 	// }
 	c.header('content-type', 'video/mp4')
-	c.header('cache-control', videoRes.status === 200 ? 'public, max-age=31536000' : 'no-cache')
+	c.header('cache-control', videoRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
   return c.body(videoBuffer)
 })
 
