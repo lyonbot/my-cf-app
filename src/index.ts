@@ -47,13 +47,33 @@ app.use(async (c, next) => {
 	return next()
 })
 
-app.use(async (c, next) => {
-	if (!c.req.path.startsWith('/to/')) return next()
+function cascadeIndexOf(text: string, locators: (string | RegExp)[], from = 0) {
+	let pos = from;
+	for (let extract of locators) {
+		if (typeof extract === 'string') {
+			pos = text.indexOf(extract, pos)
+		} else {
+			const re = new RegExp(extract.source, extract.flags + (extract.global ? '' : 'g'))
+			re.lastIndex = pos
+			const match = re.exec(text)
+			pos = match?.index ?? -1
+		}
+		if (pos === -1) return pos
+	}
 
-	let rawUrl = c.req.raw.url
-	let pos = rawUrl.indexOf('/to/')
-	rawUrl = rawUrl.slice(pos + 4)
+	return pos
+}
 
+function slice2(text: string, start: number | (string | RegExp)[], endAt: (string | RegExp)[]) {
+	if (typeof start !== 'number') start = cascadeIndexOf(text, start)
+	if (start < 0) return ''
+
+	let end = cascadeIndexOf(text, endAt, start)
+	if (end < start) return ''
+	return text.slice(start, end)
+}
+
+async function getProxyResponse(c: Context, rawUrl: string | URL) {
 	const url = new URL(rawUrl)
 	const headers = {} as Record<string, string>
 	for (let [k, v] of Object.entries(c.req.header())) {
@@ -83,22 +103,15 @@ app.use(async (c, next) => {
 
 	if (balanceExtract.length) {
 		let text = await res.text()
-		let pos = 0;
-		for (let extract of balanceExtract) {
+		let extractedFrom = cascadeIndexOf(text, balanceExtract.map(extract => {
 			const isRE = extract.startsWith('/') && /^\/(.+)\/([ium]*?)$/.exec(extract)
-			if (isRE) {
-				const re = new RegExp(isRE[1], isRE[2] + 'g')
-				re.lastIndex = pos
-				const match = re.exec(text)
-				pos = match?.index ?? -1
-			} else {
-				pos = text.indexOf(extract, pos)
-			}
-			if (pos === -1) return c.text('');
-		}
+			if (isRE) return new RegExp(isRE[1], isRE[2])
+			return extract
+		}))
 
-		text = text.slice(pos)
-		return c.text(balancedMatch(text)?.content || '', 200, {
+		let extractedText = extractedFrom !== -1 && balancedMatch(text.slice(extractedFrom))?.content
+
+		return c.text(extractedText || '', 200, {
 			'x-processed-by': 'extract-balance',
 		})
 	}
@@ -107,6 +120,16 @@ app.use(async (c, next) => {
 		status: res.status,
 		headers: resHeaders,
 	})
+}
+
+app.use(async (c, next) => {
+	if (!c.req.path.startsWith('/to/')) return next()
+
+	let rawUrl = c.req.raw.url
+	let pos = rawUrl.indexOf('/to/')
+	rawUrl = rawUrl.slice(pos + 4)
+
+	return await getProxyResponse(c, rawUrl)
 })
 
 app.get('/', (c) => c.html(homepageHTML))
@@ -209,4 +232,85 @@ app.get('/shutter-stock-video', async (c) => {
 	return c.body(videoBuffer)
 })
 
-export default app;
+app.get('/douban/movie', async (c) => {
+	const id = c.req.query('id')
+	if (!id) return c.json({ error: 'id is required' }, 400)
+
+	const url = 'https://movie.douban.com/subject/' + encodeURIComponent(id)
+	const resp = await getProxyResponse(c, url)
+	const text = await resp.text()
+	const proxyUrlPrefix = new URL(c.req.raw.url).origin + '/to/'
+
+	const base = JSON.parse(balancedMatch(text.slice(cascadeIndexOf(text, [
+		'application/ld+json',
+		'{'
+	])))!.content)
+
+	let related = [] as { id: string, title: string, rating: string, cover: string }[]
+	{
+		let sectionHTML = slice2(text, ['class="recommendations-'], ['</div>'])
+		let start = 0
+		while ((start = cascadeIndexOf(sectionHTML, ['<dl'], start)) !== -1) {
+			let end = sectionHTML.indexOf('</dl>', start)
+			let itemHTML = sectionHTML.slice(start, end)
+			if (end === -1) break
+
+			const id = /\/(\d+)\//.exec(itemHTML)?.[1]
+			if (!id) continue
+			related.push({
+				title: slice2(itemHTML, cascadeIndexOf(itemHTML, ['alt=', '"']) + 1, ['"']),
+				cover: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['src=', '"']) + 1, ['"']),
+				rating: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['rate', '>']) + 1, ['<']),
+				id,
+			})
+		}
+	}
+
+	return c.json({
+		id,
+		type: base['@type'],
+		title: base.name,
+		url: 'https://movie.douban.com/subject/' + id,
+		cover: proxyUrlPrefix + base.image,
+		rating: base.aggregateRating.ratingValue,
+		genre: base.genre,
+		datePublished: base.datePublished,
+		author: base.author,
+		actor: base.actor,
+		director: base.director,
+		description: slice2(text, ['property="v:summary"', '>'], ['</span']).slice(1).trim(),
+
+		related,
+	})
+})
+
+app.get('/douban/search-movie', async (c) => {
+	const query = c.req.query('query')?.trim()
+	const page = +c.req.query('page')! || 1
+	if (!query) return c.json({ error: 'query is required' }, 400)
+
+	let url = 'https://search.douban.com/movie/subject_search?search_text=' + encodeURIComponent(query) + '&cat=1002&__balanceExtract=window.__DATA__'
+	if (page > 1) url += '&start=' + (page - 1) * 15
+
+	const resp = await getProxyResponse(c, url)
+	const json: any = await resp.json()
+
+	const proxyUrlPrefix = new URL(c.req.raw.url).origin + '/to/'
+
+	return c.json({
+		total: json.total,
+		data: json.items
+			.filter((x: any) => x.tpl_name === 'search_subject')
+			.map((x: any) => ({
+				id: x.id,
+				title: x.title,
+				cover: proxyUrlPrefix + x.cover_url,
+				rating: x.rating.value,
+				url: x.url,
+				abstract: x.abstract,
+				abstract_2: x.abstract_2,
+			}))
+	})
+})
+
+export default app; 
