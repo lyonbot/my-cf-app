@@ -315,4 +315,39 @@ app.get('/douban/search-movie', async (c) => {
 	})
 })
 
+app.post('/chat/kindly', async (c) => {
+	const { message } = await c.req.json()
+	const ans = await fetch(`https://${c.env!.AZURE_OPENAI_DOMAIN}/openai/deployments/gpt4o/chat/completions?api-version=2024-02-01`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'api-key': String(c.env!.AZURE_OPENAI_KEY)
+		},
+		body: JSON.stringify({
+			messages: [
+				{ role: "system", content: "你刚刚加入一段对话中，请以最亲和的方式接上话茬，不要让气氛尴尬，可以用夸赞的语气和emoji增强亲和力🤗。" },
+				{ role: "user", content: message },
+			],
+		}),
+	});
+
+	const fallbacks = [
+		"嗯，我暂时没什么好说的🤔",
+		"哦，这个问题让我有点困惑😅",
+		"哎呀，我有点不知道该怎么接了🤷‍♂️",
+		"我还在想怎么回答呢🤔",
+		"这个话题有点超出我的知识范围了😅",
+		"让我想一想该怎么接话🤔",
+		"我一时不知道该说什么了🤷‍♀️",
+		"我暂时没什么想法🧐",
+		"这个问题我需要再想想🤔",
+		"我感到有点迷茫，不知道该怎么接😅"
+	]
+
+	const json = await ans.json() as any
+	return c.json({
+		message: json?.choices?.[0]?.message?.content || fallbacks[Math.floor(Math.random() * fallbacks.length)]
+	})
+})
+
 export default app; 
