@@ -246,7 +246,7 @@ app.get('/douban/movie', async (c) => {
 		'{'
 	])))!.content)
 
-	let related = [] as { id: string, title: string, rating: string, cover: string }[]
+	let related = [] as { id: string, title: string, rating: string, cover: string, url: string }[]
 	{
 		let sectionHTML = slice2(text, ['class="recommendations-'], ['</div>'])
 		let start = 0
@@ -254,14 +254,16 @@ app.get('/douban/movie', async (c) => {
 			let end = sectionHTML.indexOf('</dl>', start)
 			let itemHTML = sectionHTML.slice(start, end)
 			if (end === -1) break
+			start = end;
 
 			const id = /\/(\d+)\//.exec(itemHTML)?.[1]
 			if (!id) continue
 			related.push({
+				id,
 				title: slice2(itemHTML, cascadeIndexOf(itemHTML, ['alt=', '"']) + 1, ['"']),
 				cover: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['src=', '"']) + 1, ['"']),
 				rating: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['rate', '>']) + 1, ['<']),
-				id,
+				url: 'https://movie.douban.com/subject/' + encodeURIComponent(id)
 			})
 		}
 	}

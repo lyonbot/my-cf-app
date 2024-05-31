@@ -15,6 +15,15 @@ Search for images from unsplash
 - orientation ?= 'landscape' | 'portrait' | 'square'
 - pick ?= 0 -- redirect to a random image
 
+## /douban/search-movie
+
+- query
+- page ?= 1
+
+## /douban/movie
+
+- id
+
 ## /to/:url
 
 代理到对应的地址。同时修改 CORS 响应头。
