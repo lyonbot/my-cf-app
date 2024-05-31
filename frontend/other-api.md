@@ -15,6 +15,10 @@ Search for images from unsplash
 - orientation ?= 'landscape' | 'portrait' | 'square'
 - pick ?= 0 -- redirect to a random image
 
+## /chat/kindly
+
+POST: { message: "啊啊啊" }
+
 ## /douban/search-movie
 
 - query
