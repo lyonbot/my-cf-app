@@ -4,6 +4,7 @@ import { TTSPage } from "./tts";
 import { DownloaderPage } from "./downloader";
 import { OtherAPIPage } from "./other-api";
 import './index.css';
+import 'github-markdown-css/github-markdown-light.css'
 
 const pageApps = {
   TTS: TTSPage,

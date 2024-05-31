@@ -1,9 +1,10 @@
-import { Hono } from 'hono';
+import { Context, Hono } from 'hono';
 import { EdgeTTS } from "./edge-tts"
 import { parseMedia } from './media-parser';
 import { searchShutterStockVideo } from './shutter-stock';
 import { homepageHTML } from "./static";
 import { searchUnsplash } from './unsplash';
+import { balancedMatch } from './utils/balanceMatch';
 
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
@@ -37,12 +38,75 @@ app.use(async (c, next) => {
 	c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 	c.header("Access-Control-Allow-Headers", "Content-Type")
 	c.header("Access-Control-Max-Age", "86400")
+	c.header("Access-Control-Allow-Credentials", "true")
 	c.header("Vary", "Origin")
 
 	if (c.req.method === 'OPTIONS') {
 		return c.body('OK')
 	}
 	return next()
+})
+
+app.use(async (c, next) => {
+	if (!c.req.path.startsWith('/to/')) return next()
+
+	let rawUrl = c.req.raw.url
+	let pos = rawUrl.indexOf('/to/')
+	rawUrl = rawUrl.slice(pos + 4)
+
+	const url = new URL(rawUrl)
+	const headers = {} as Record<string, string>
+	for (let [k, v] of Object.entries(c.req.header())) {
+		if (k.startsWith('cf-')) continue
+		if (k.startsWith('x-real')) continue
+		if (k.startsWith('x-forward')) continue
+		if (k === 'host') v = url.hostname
+		headers[k] = v
+	}
+
+	const balanceExtract = url.searchParams.getAll('__balanceExtract')
+	if (balanceExtract.length) url.searchParams.delete('__balanceExtract')
+
+	const res = await fetch(url, {
+		method: c.req.method,
+		body: c.req.raw.body,
+		headers,
+	}) as Response
+
+	let resBody = res.body
+	const resHeaders = {} as Record<string, string>
+	res.headers.forEach((value, key) => {
+		if (key.startsWith('access-control-')) return
+		if (key === 'location') value = '/to/' + new URL(value, url).href
+		resHeaders[key] = value
+	})
+
+	if (balanceExtract.length) {
+		let text = await res.text()
+		let pos = 0;
+		for (let extract of balanceExtract) {
+			const isRE = extract.startsWith('/') && /^\/(.+)\/([ium]*?)$/.exec(extract)
+			if (isRE) {
+				const re = new RegExp(isRE[1], isRE[2] + 'g')
+				re.lastIndex = pos
+				const match = re.exec(text)
+				pos = match?.index ?? -1
+			} else {
+				pos = text.indexOf(extract, pos)
+			}
+			if (pos === -1) return c.text('');
+		}
+
+		text = text.slice(pos)
+		return c.text(balancedMatch(text)?.content || '', 200, {
+			'x-processed-by': 'extract-balance',
+		})
+	}
+
+	return c.body(resBody, {
+		status: res.status,
+		headers: resHeaders,
+	})
 })
 
 app.get('/', (c) => c.html(homepageHTML))
@@ -114,7 +178,7 @@ app.get('/unsplash', async (c) => {
 	const imageBuffer = await imageRes.arrayBuffer()
 	c.header('content-type', imageRes.headers.get('content-type') || 'image/jpg')
 	c.header('cache-control', imageRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
-  return c.body(imageBuffer)
+	return c.body(imageBuffer)
 })
 
 app.get('/shutter-stock-video', async (c) => {
@@ -136,13 +200,13 @@ app.get('/shutter-stock-video', async (c) => {
 
 	const videoRes = await fetch(videoURL)
 	const videoBuffer = await videoRes.arrayBuffer()
-	
+
 	// for (const k of ['Content-Type', 'Content-Length', 'content-encoding']) {
 	// 	if (videoRes.headers.get(k)) c.header(k, videoRes.headers.get(k)!)
 	// }
 	c.header('content-type', 'video/mp4')
 	c.header('cache-control', videoRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
-  return c.body(videoBuffer)
+	return c.body(videoBuffer)
 })
 
 export default app;

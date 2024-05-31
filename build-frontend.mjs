@@ -17,12 +17,13 @@ const ctx = await esbuild.context({
   sourcemap: isDev ? 'inline' : false,
   loader: {
     ".svg": "dataurl",
+    ".md": "text",
   },
   logLevel: "info",
   plugins: [
     solidPlugin(),
     tailwindPlugin(),
-    sassPlugin(),
+    sassPlugin({}),
     {
       name: 'myOutput',
       setup(build) {

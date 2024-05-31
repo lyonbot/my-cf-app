@@ -1,20 +1,11 @@
-export function OtherAPIPage() {
-  return <div>
-    <h2>/unsplash</h2>
-    <p>Search for images from unsplash</p>
-    <ul>
-      <li>query</li>
-      <li>page ?= 1</li>
-      <li>pick ?= 0 -- redirect to a random image</li>
-    </ul>
+import { marked } from 'marked'
+import content from './other-api.md'
 
-    <h2>/shutter-stock-video</h2>
-    <p>Search for videos from shutter-stock</p>
-    <ul>
-      <li>query</li>
-      <li>page ?= 1</li>
-      <li>orientation ?= 'landscape' | 'portrait' | 'square'</li>
-      <li>pick ?= 0 -- redirect to a random image</li>
-    </ul>
-  </div>
+export function OtherAPIPage() {
+  return <div class='markdown-body' style='margin: 0 20px' ref={el => {
+    Promise.resolve(marked.parse(content, {
+      gfm: true,
+      breaks: true,
+    })).then(html => el.innerHTML = html)
+  }}></div>
 }

@@ -22,7 +22,10 @@
     "deploy": "node ./build-frontend.mjs && wrangler publish"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.13",
     "bulma": "^0.9.4",
-    "hono": "^4.3.6"
+    "github-markdown-css": "^5.5.1",
+    "hono": "^4.3.6",
+    "marked": "^12.0.2"
   }
 }
