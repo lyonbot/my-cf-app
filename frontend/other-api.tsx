@@ -49,7 +49,6 @@ const ParamInput: Component<{
   handleInputChange: (name: string, value: any) => void;
 }> = (props) => {
   const initialValue = props.param.required && props.param.example
-  if (initialValue) props.handleInputChange(props.name, initialValue);
 
   return (
     <div class="field is-horizontal">
@@ -67,6 +66,7 @@ const ParamInput: Component<{
             type="text"
             style={{ 'min-width': '400px' }}
             value={initialValue || ''}
+            ref={ref => setTimeout(() => { props.handleInputChange(props.name, ref.value) }, 50)}
             placeholder={props.param.example && `eg. ${props.param.example}`}
             onInput={(e) => props.handleInputChange(props.name, e.currentTarget.value)} />
         </div>
