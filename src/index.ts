@@ -1,4 +1,5 @@
 import { Context, Hono } from 'hono';
+import { unescape } from 'lodash'
 import { EdgeTTS } from "./edge-tts"
 import { parseMedia } from './media-parser';
 import { searchShutterStockVideo } from './shutter-stock';
@@ -71,6 +72,23 @@ function slice2(text: string, start: number | (string | RegExp)[], endAt: (strin
 	let end = cascadeIndexOf(text, endAt, start)
 	if (end < start) return ''
 	return text.slice(start, end)
+}
+
+async function proxiesAsset(c: Context, url: string | undefined, fallback: string) {
+	const res = url && await fetch(url)
+	if (!res || res.status !== 200) {
+		return c.redirect(fallback, 301)
+	}
+
+	c.header('x-source', url)
+	c.header('content-type', res.headers.get('content-type') || 'audio/mp3')
+	c.header('cache-control', res.status === 200 ? 'public, max-age=38400' : 'no-cache')
+
+	for (const name of ['content-length', 'content-encoding']) {
+		let t = res.headers.get(name)
+		if (t) c.header(name, t)
+	}
+	return c.body(res.body)
 }
 
 async function getProxyResponse(c: Context, rawUrl: string | URL) {
@@ -180,7 +198,8 @@ app.get('/pro/*', async (c) => {
 	return c.body(await resp.arrayBuffer())
 })
 
-app.get('/unsplash', async (c) => {
+app.get('/unsplash', c => c.redirect('/assets/image' + new URL(c.req.url).search))
+app.get('/assets/image', async (c) => {
 	const query = c.req.query('query')
 	const page = (+c.req.query('page')!) || 1
 	const size = (+c.req.query('size')!) || 20
@@ -194,17 +213,16 @@ app.get('/unsplash', async (c) => {
 	if (!randomPick) return c.json(result)
 
 	// random pick image
-	const randomIndex = randomPick % result.results.length
-	const imageUrl = result.results[randomIndex].urls.regular;
-
-	const imageRes = await fetch(imageUrl)
-	const imageBuffer = await imageRes.arrayBuffer()
-	c.header('content-type', imageRes.headers.get('content-type') || 'image/jpg')
-	c.header('cache-control', imageRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
-	return c.body(imageBuffer)
+	const imageUrl = result.results[randomPick % result.results.length]?.urls.regular;
+	return proxiesAsset(
+		c,
+		imageUrl,
+		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/d0147f7d.jpg`
+	)
 })
 
-app.get('/shutter-stock-video', async (c) => {
+app.get('/shutter-stock-video', c => c.redirect('/assets/video' + new URL(c.req.url).search))
+app.get('/assets/video', async (c) => {
 	const query = c.req.query('query')
 	const orientation = c.req.query('orientation') as 'landscape' | 'portrait' | 'square'
 	const page = (+c.req.query('page')!) || 1
@@ -216,20 +234,73 @@ app.get('/shutter-stock-video', async (c) => {
 	const result = await searchShutterStockVideo(query, { page, orientation })
 	if (!randomPick) return c.json(result)
 
-	// random pick image
+	// random pick video
 	const videos = result.videos
-	const randomIndex = randomPick % videos.length
-	const videoURL = videos[randomIndex].video_files[0].link
+	return await proxiesAsset(
+		c,
+		videos[randomPick % videos.length]?.video_files?.[0]?.link,
+		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/364f8592.mp4`
+	)
+})
 
-	const videoRes = await fetch(videoURL)
-	const videoBuffer = await videoRes.arrayBuffer()
+const musicGenres = { "International": ["African", "Asia-Far_East", "Balkan", "Brazilian", "Celtic", "Europe", "flamenco", "French", "Indian", "Latin", "Latin_America", "Middle_East", "Pacific", "Polka", "Reggae_-_Dub", "International", "Rock", "Soundtrack", "Disco", "New_Wave", "Electro-punk", "Instrumental", "Jazz", "Electronic", "Industrial", "Experimental_Pop", "Lounge", "Folk", "Easy_Listening", "Afrobeat"], "Blues": ["Gospel", "Blues", "Country", "Singer-Songwriter", "Americana", "Acoustic_1427", "Jazz", "Soul-RB", "Country__Western", "Lo-fi-Folk", "Free-Folk", "Folk", "Electronic", "Instrumental", "Noise-Rock", "Psych-Rock", "Easy_Listening", "Rock"], "Jazz": ["Be-Bop", "Big_BandSwing", "Free-Jazz", "Jazz_Out", "Jazz_Vocal", "Modern_Jazz", "Jazz", "Blues", "Soul-RB", "Lo-fi-Instrumental", "Hip-Hop_Beats", "Instrumental", "Easy_Listening", "Post-Rock", "Krautrock", "Soundtrack", "Ambient_Electronic"], "novelty": ["holiday", "Kid-Friendly", "Sound_Effects", "novelty", "Soundtrack", "Instrumental", "Ambient_Electronic", "Ambient", "Classical", "Pop", "Folk", "Country", "Blues", "Rock", "Experimental", "Old-Time__Historic", "Spoken"], "Old-Time__Historic": ["Old-Time__Historic", "Freak-folk", "Celtic", "Garage", "Post-Punk", "Soundtrack", "Composed_Music", "Ambient", "New_Age", "International", "Hip-Hop", "Spoken", "Classical", "Symphony", "Jazz"], "Country": ["Americana", "Bluegrass", "Country__Western", "Rockabilly", "Country", "Blues", "Singer-Songwriter", "Afrobeat", "African", "Pop", "Folk", "Spoken", "Lo-fi-Folk", "Free-Folk", "Instrumental"], "Pop": ["Experimental_Pop", "Synth_Pop", "Pop", "Electronic", "Instrumental", "Electroacoustic", "Funk", "Dance", "holiday", "Country", "Folk", "Hip-Hop_Beats", "Ambient_Electronic", "piano", "Rock", "Avant-Garde", "Noise-Rock", "Singer-Songwriter"], "Instrumental": ["Ambient", "Easy_Listening", "Lo-fi-Instrumental", "New_Age", "Soundtrack", "Instrumental", "Pop", "Electronic", "Electroacoustic", "Funk", "Hip-Hop_Beats", "Lo-fi-Hip-Hop", "Lo-fi", "rap", "piano", "Rock", "House", "Lo-fi-Experimental", "Indie-Rock", "Classical", "Chill-out", "Ambient_Electronic", "Post-Rock", "Progressive"], "Rock": ["Garage", "Goth", "Indie-Rock", "Industrial", "Krautrock", "Lo-fi", "Loud-Rock", "Metal", "New_Wave", "Post-Rock", "Progressive", "Psych-Rock", "Punk", "Rock_Opera", "Shoegaze", "Rock", "Singer-Songwriter", "Electronic", "Instrumental", "Funk", "Lo-fi-Instrumental", "Soundtrack"], "Soul-RB": ["Disco", "Funk", "Lo-fi-Soul-RnB", "Soul-RB", "Deep_Funk", "Blues", "Jazz", "Hip-Hop_Beats", "Instrumental", "Pop", "Hip-Hop"], "Spoken": ["banter", "Comedy", "Musical_Theater", "Poetry", "Radio", "Radio_Theater", "Spoken_Weird", "Spoken_Word", "Spoken", "Country", "Folk", "Noise-Rock", "Psych-Rock", "Singer-Songwriter", "Acoustic_1427", "International", "Old-Time__Historic", "Audio_Collage", "Experimental", "novelty", "Lo-fi"], "Experimental": ["Audio_Collage", "Avant-Garde", "Drone", "Electroacoustic", "Field_Recordings", "Improv", "Lo-fi-Experimental", "Minimalism_1456", "Musique_Concrete", "Noise", "Sound_Art", "Sound_Collage", "Sound_Poetry", "Unclassifiable", "Experimental", "Soundtrack", "Composed_Music", "Electronic", "Ambient_Electronic", "Dance", "Lo-fi-Electronic", "Lo-fi-Instrumental", "Industrial", "New_Age", "Ambient", "Instrumental", "Experimental_Pop", "Synth_Pop", "piano", "Radio"], "Folk": ["Acoustic_1427", "British_Folk", "Freak-folk", "Free-Folk", "Lo-fi-Folk", "Psych-Folk", "Singer-Songwriter", "Folk", "Country", "Pop", "Spoken", "Kid-Friendly", "holiday", "Electronic", "Instrumental", "Shoegaze", "Rock", "Soundtrack"], "Classical": ["20th_Century_Classical", "Chamber_Music", "Choral_Music", "Composed_Music", "Contemporary_Classical_1147", "Opera", "piano", "Symphony", "Classical", "Chill-out", "Instrumental", "Soundtrack", "Ambient"], "Electronic": ["Ambient_Electronic", "Breakcore_-_Hard", "Chip_Music", "Dance", "Downtempo", "Drum_amp_Bass", "Dubstep", "Glitch", "House", "IDM", "Jungle", "Lo-fi-Electronic", "Minimal_Electronic", "Techno", "Trip-Hop", "vaporwave", "Electronic", "Pop", "Instrumental", "Progressive", "Experimental", "Lo-fi", "Soundtrack", "Lo-fi-Experimental", "Lo-fi-Instrumental", "Chill-out", "Hip-Hop_Beats", "Easy_Listening", "Industrial", "New_Age", "Ambient"], "Hip-Hop": ["Alternative_Hip-Hop", "breakbeat", "hiphop", "Hip-Hop_Beats", "Lo-fi-Hip-Hop", "Nerdcore", "rap", "Wonky", "Hip-Hop", "Instrumental", "Electronic", "Chill-out", "Soul-RB", "Pop", "Experimental"] }
+const musicGenresFlatten = Object.values(musicGenres).flat()
 
-	// for (const k of ['Content-Type', 'Content-Length', 'content-encoding']) {
-	// 	if (videoRes.headers.get(k)) c.header(k, videoRes.headers.get(k)!)
-	// }
-	c.header('content-type', 'video/mp4')
-	c.header('cache-control', videoRes.status === 200 ? 'public, max-age=38400' : 'no-cache')
-	return c.body(videoBuffer)
+app.get('/assets/music/genres', c => c.json(musicGenres))
+app.get('/assets/music', async (c) => {
+	const query = c.req.query('query')
+	const genre = c.req.query('genre')
+	const page = (+c.req.query('page')!) || 1
+	const randomPick = +c.req.query('pick')!
+
+	if (!query) return c.json({ error: 'query is required' }, 400)
+	if (genre && !genre.split(',').every(g => musicGenresFlatten.includes(g))) return c.json({ error: 'genre must be a comma-separated list of valid genres', musicGenres }, 400)
+
+	const url = new URL('https://freemusicarchive.org/search?adv=1&quicksearch=')
+	url.searchParams.set('quicksearch', query)
+	if (page > 1) url.searchParams.set('page', page.toString())
+	if (genre) url.searchParams.set('search-genre', genre)
+	const html = await (await getProxyResponse(c, url)).text()
+
+	const result = [] as {
+		id: string;
+		// handle: string;
+		url: string;
+		title: string;
+		artistName: string;
+		artistUrl: string;
+		playbackUrl: string;
+		downloadUrl: string;
+
+		genres: string[]
+		duration: string
+	}[]
+
+	html.split('play-item').forEach(part => {
+		const e = slice2(part, ['data-track-info', '"'], [/["'\s]>/]).slice(1)
+		if (!e) return
+		try {
+			const obj = JSON.parse(unescape(e))
+			if (!obj.playbackUrl) return
+
+			const genres = Array.from(part.matchAll(/\/genre\/[^>]*>([^<]+)/gm), m => m[1])
+			obj.genres = genres
+
+			const duration = part.match(/\b(\d\d:\d\d)\b/)?.[1] || ''
+			obj.duration = duration
+
+			result.push(obj)
+		} catch {
+			// pass
+		}
+	})
+
+	if (!randomPick) return c.json(result)
+	return await proxiesAsset(
+		c,
+		result[randomPick % result.length]?.playbackUrl,
+		'https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/f7a2de8f.mp3'
+	)
 })
 
 app.get('/douban/movie', async (c) => {
@@ -317,7 +388,7 @@ app.get('/douban/search-movie', async (c) => {
 
 app.post('/chat/kindly', async (c) => {
 	const { message } = await c.req.json()
-	const ans = await fetch(`https://${c.env!.AZURE_OPENAI_DOMAIN}/openai/deployments/gpt4o/chat/completions?api-version=2024-02-01`, {
+	const ans = await fetch(`https://${c.env!.AZURE_OPENAI_DOMAIN}/openai/deployments/gpt3/chat/completions?api-version=2024-02-01`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
