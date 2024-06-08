@@ -74,14 +74,14 @@ function slice2(text: string, start: number | (string | RegExp)[], endAt: (strin
 	return text.slice(start, end)
 }
 
-async function proxiesAsset(c: Context, url: string | undefined, fallback: string) {
+async function proxiesAsset(c: Context, url: string | undefined, fallback: string, defaultMime: string) {
 	const res = url && await fetch(url)
 	if (!res || res.status !== 200) {
 		return c.redirect(fallback, 301)
 	}
 
 	c.header('x-source', url)
-	c.header('content-type', res.headers.get('content-type') || 'audio/mp3')
+	c.header('content-type', res.headers.get('content-type') || defaultMime)
 	c.header('cache-control', res.status === 200 ? 'public, max-age=38400' : 'no-cache')
 
 	for (const name of ['content-length', 'content-encoding']) {
@@ -217,7 +217,8 @@ app.get('/assets/image', async (c) => {
 	return proxiesAsset(
 		c,
 		imageUrl,
-		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/d0147f7d.jpg`
+		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/d0147f7d.jpg`,
+		'image/jpeg',
 	)
 })
 
@@ -239,7 +240,8 @@ app.get('/assets/video', async (c) => {
 	return await proxiesAsset(
 		c,
 		videos[randomPick % videos.length]?.video_files?.[0]?.link,
-		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/364f8592.mp4`
+		`https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/364f8592.mp4`,
+		'video/mp4',
 	)
 })
 
@@ -299,7 +301,8 @@ app.get('/assets/music', async (c) => {
 	return await proxiesAsset(
 		c,
 		result[randomPick % result.length]?.playbackUrl,
-		'https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/f7a2de8f.mp3'
+		'https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/f7a2de8f.mp3',
+		'audio/mpeg',
 	)
 })
 
@@ -388,6 +391,9 @@ app.get('/douban/search-movie', async (c) => {
 
 app.post('/chat/kindly', async (c) => {
 	const { message } = await c.req.json()
+	if (!message || typeof message !== 'string') return c.json({ error: 'message is required' }, 400)
+	if (message.length > 256) return c.json({ error: 'message is too long' }, 400)
+
 	const ans = await fetch(`https://${c.env!.AZURE_OPENAI_DOMAIN}/openai/deployments/gpt3/chat/completions?api-version=2024-02-01`, {
 		method: 'POST',
 		headers: {
@@ -395,6 +401,7 @@ app.post('/chat/kindly', async (c) => {
 			'api-key': String(c.env!.AZURE_OPENAI_KEY)
 		},
 		body: JSON.stringify({
+			max_tokens: 256,
 			messages: [
 				{ role: "system", content: "你刚刚加入一段对话中，请以最亲和的方式接上话茬，不要让气氛尴尬，可以用夸赞的语气和emoji增强亲和力🤗。" },
 				{ role: "user", content: message },
