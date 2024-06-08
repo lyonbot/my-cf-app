@@ -336,11 +336,16 @@ app.get('/douban/movie', async (c) => {
 				id,
 				title: slice2(itemHTML, cascadeIndexOf(itemHTML, ['alt=', '"']) + 1, ['"']),
 				cover: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['src=', '"']) + 1, ['"']),
-				rating: proxyUrlPrefix + slice2(itemHTML, cascadeIndexOf(itemHTML, ['rate', '>']) + 1, ['<']),
+				rating: slice2(itemHTML, cascadeIndexOf(itemHTML, ['rate', '>']) + 1, ['<']),
 				url: 'https://movie.douban.com/subject/' + encodeURIComponent(id)
 			})
 		}
 	}
+
+	let description = slice2(text, ['property="v:summary"', '>'], ['</div']).slice(1)
+	if (description.includes('show_full')) description = slice2(description, ['show_full', /<\w+/, '>'], ['</']).slice(1)
+	else description = description.slice(0, description.indexOf('</'))
+	description = description.replace(/\s*<br\s*\/>\s*/g, '\n')
 
 	return c.json({
 		id,
@@ -354,7 +359,7 @@ app.get('/douban/movie', async (c) => {
 		author: base.author,
 		actor: base.actor,
 		director: base.director,
-		description: slice2(text, ['property="v:summary"', '>'], ['</span']).slice(1).trim(),
+		description: description.trim(),
 
 		related,
 	})
