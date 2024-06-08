@@ -1,50 +1,8 @@
-# 无稳定性保障的 API 们
+## 特殊保留
 
-## /assets/image
+### /to/:url
 
-Search for images from unsplash
-
-- query
-- page ?= 1
-- pick ?= 0 -- redirect to a random image
-
-## /assets/video
-
-Search for videos for placeholders
-
-- query
-- page ?= 1
-- orientation ?= 'landscape' | 'portrait' | 'square'
-- pick ?= 0 -- redirect to a random video
-
-## /assets/music
-
-Search for music
-
-- query
-- genre ?= (comma separated list of genre names, see [/assets/music/genres](/assets/music/genres) )
-- page ?= 1
-- pick ?= 0 -- redirect to a random music
-
-## /chat/kindly
-
-(method=POST) chat with a dumb AI. it always
-
-- with JSON `{ message: "今天天气太差了" }`
-- respond with JSON `{ "message": "没有啊，今天天气不错啊" }`
-
-## /douban/search-movie
-
-- query
-- page ?= 1
-
-## /douban/movie
-
-- id
-
-## /to/:url
-
-代理到对应的地址。同时修改 CORS 响应头。
+返回对应的地址的数据。同时修改 CORS 响应头。
 
 > _特殊功能_ 支持传入 `__balanceExtract=xxx` 参数，从而提取文档里的 JSON 数据。
 >
