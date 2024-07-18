@@ -199,6 +199,11 @@ app.get('/pro/*', async (c) => {
 })
 
 app.get('/unsplash', c => c.redirect('/assets/image' + new URL(c.req.url).search))
+app.get('/assets/image/:query/:pick', c =>
+	c.redirect('/assets/image?' + new URLSearchParams({
+		query: c.req.param('query'),
+		pick: /\d+/.exec(c.req.param('pick'))?.[0] || '',
+	})))
 app.get('/assets/image', async (c) => {
 	const query = c.req.query('query')
 	const page = (+c.req.query('page')!) || 1
@@ -223,6 +228,11 @@ app.get('/assets/image', async (c) => {
 })
 
 app.get('/shutter-stock-video', c => c.redirect('/assets/video' + new URL(c.req.url).search))
+app.get('/assets/video/:query/:pick', c =>
+	c.redirect('/assets/video?' + new URLSearchParams({
+		query: c.req.param('query'),
+		pick: /\d+/.exec(c.req.param('pick'))?.[0] || '',
+	})))
 app.get('/assets/video', async (c) => {
 	const query = c.req.query('query')
 	const orientation = c.req.query('orientation') as 'landscape' | 'portrait' | 'square'
@@ -249,6 +259,11 @@ const musicGenres = { "International": ["African", "Asia-Far_East", "Balkan", "B
 const musicGenresFlatten = Object.values(musicGenres).flat()
 
 app.get('/assets/music/genres', c => c.json(musicGenres))
+app.get('/assets/music/:query/:pick', c =>
+	c.redirect('/assets/music?' + new URLSearchParams({
+		query: c.req.param('query'),
+		pick: /\d+/.exec(c.req.param('pick'))?.[0] || '',
+	})))
 app.get('/assets/music', async (c) => {
 	const query = c.req.query('query')
 	const genre = c.req.query('genre')

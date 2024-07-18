@@ -17,7 +17,7 @@ export const apis: APIEntrypoint[] = [
   {
     path: "/assets/image",
     method: "GET",
-    description: "Search for images from Unsplash",
+    description: "Search for images\n\n**note**: also supports urls like `/assets/image/apple/123.jpg`",
     queryParams: {
       query: {
         description: "Search query for images",
@@ -37,7 +37,7 @@ export const apis: APIEntrypoint[] = [
   {
     path: "/assets/video",
     method: "GET",
-    description: "Search for videos for placeholders",
+    description: "Search for videos for placeholders\n\n**note**: also supports urls like `/assets/video/race/123.mp4`", 
     queryParams: {
       query: {
         description: "Search query for videos",
@@ -61,7 +61,7 @@ export const apis: APIEntrypoint[] = [
   {
     path: "/assets/music",
     method: "GET",
-    description: "Search for music",
+    description: "Search for music\n\n**note**: also supports urls like `/assets/music/opera/123.mp3`",
     queryParams: {
       query: {
         description: "Search query for music",
