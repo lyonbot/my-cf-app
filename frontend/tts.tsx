@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { fetchJson, FormField, modelX } from "./utils";
 import type { VoiceInfo } from '../src/edge-tts'
 
@@ -25,6 +25,12 @@ export function TTSPage() {
     if (!url) return
     return () => URL.revokeObjectURL(url)
   })
+
+  const audioDownloadAPIUrl = createMemo(() => `/tts?${new URLSearchParams({
+    voice: voice(),
+    format: 'audio',
+    text: text(),
+  })}`)
 
   async function start() {
     try {
@@ -104,6 +110,8 @@ export function TTSPage() {
         </FormField>
 
       </Show>
+
+      <a href={audioDownloadAPIUrl()} download="audio.mp3" class="button is-link">下载音频文件（API）</a>
     </div>
   </section>
 }

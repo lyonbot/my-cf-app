@@ -162,7 +162,10 @@ app.get('/tts', async (c) => {
 	));
 
 	const blob = new Blob([...result.chunks], { type: 'audio/mpeg' })
-	if (format === 'audio') return c.body(blob.stream())
+	if (format === 'audio') {
+		c.header('content-type', 'audio/mp3')
+		return c.body(blob.stream())
+	}
 
 	return c.json({
 		audio: btoa(Array.from(new Uint8Array(await blob.arrayBuffer()), x => String.fromCharCode(x)).join('')),
