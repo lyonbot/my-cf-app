@@ -56,7 +56,12 @@ const App = () => {
     </nav>
 
     <div class="appContent">
-      <Suspense>
+      <Suspense
+        fallback={<div style={{ 'text-align': 'center', padding: '100px' }}>
+          <div class="loader"></div>
+          <div>加载中...</div>
+        </div>}
+      >
         <Dynamic component={pageApps[pageKey()]} />
       </Suspense>
     </div>

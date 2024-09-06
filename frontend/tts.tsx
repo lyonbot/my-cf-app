@@ -70,7 +70,7 @@ export function TTSPage() {
         <div class="select">
           <select use:model={[voice, setVoice]}>
             <For each={voices() || []}>{
-              item => <option value={item.ShortName}>{item.Name}</option>
+              item => <option value={item.ShortName}>{item.Name.slice(1 + item.Name.indexOf('('), -1)}</option>
             }</For>
           </select>
         </div>
